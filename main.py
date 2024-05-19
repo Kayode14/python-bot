@@ -1,11 +1,13 @@
 import telebot
 import random
 import time
+from googletrans import Translator
 
 # Add your bot token here
 TOKEN = "7191033335:AAGFFNi1jEfvNQyoMR7e4Uc3Fr-VRED8ll4"
 
 bot = telebot.TeleBot(TOKEN)
+translator = Translator()
 
 userReferrals = {}  # In-memory storage for referral count and mining speed
 referralLinks = {}  # In-memory storage for referral links
@@ -57,7 +59,8 @@ def start(message):
         telebot.types.KeyboardButton("Refer a friend to earn 0.1 core and +0.015core/hr mining speed"),
         telebot.types.KeyboardButton("Claim Daily Bonus"),
         telebot.types.KeyboardButton("Check Balance"),
-        telebot.types.KeyboardButton("Withdraw")
+        telebot.types.KeyboardButton("Withdraw"),
+        telebot.types.KeyboardButton("Translate (EN/CH)")
     ))
 
 @bot.message_handler(func=lambda message: message.text == "Refer a friend to earn 0.1 core and +0.015core/hr mining speed")
@@ -89,6 +92,19 @@ def check_balance(message):
 def withdraw(message):
     bot.reply_to(message, "Minimum withdrawal is 15 core. Withdrawals will be processed at the end of every week.")
 
+@bot.message_handler(func=lambda message: message.text == "Translate (EN/CH)")
+def ask_translation(message):
+    bot.reply_to(message, "Please send the text you want to translate.")
+
+@bot.message_handler(func=lambda message: True)
+def translate_message(message):
+    userId = message.from_user.id
+    if message.text.startswith("/"):
+        return  # Skip commands
+
+    if message.reply_to_message and message.reply_to_message.text == "Please send the text you want to translate.":
+        translated_text = translator.translate(message.text, src='auto', dest='zh-cn' if message.text.isascii() else 'en').text
+        bot.reply_to(message, translated_text)
+
 # Launch the bot
 bot.polling()
-
