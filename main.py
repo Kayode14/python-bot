@@ -1,5 +1,4 @@
 import telebot
-import crypto
 import random
 import time
 
