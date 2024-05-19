@@ -9,14 +9,14 @@ bot = telebot.TeleBot(TOKEN)
 
 userReferrals = {}  # In-memory storage for referral count and mining speed
 referralLinks = {}  # In-memory storage for referral links
-botUsername = ""  # Variable to store the bot's username
 bonus = {}  # In-memory storage for daily bonus claim time
+balances = {}  # In-memory storage for user balances
 
 # Function to generate a unique referral link
 def generateReferralLink(userId):
-    referralId = crypto.random_bytes(4).hex()
+    referralId = ''.join(random.choices('0123456789abcdef', k=8))
     referralLinks[referralId] = userId
-    return f"https://t.me/pmm_miner_bot?start={referralId}"
+    return f"https://t.me/PMM_MINER_BOT?start={referralId}"
 
 # Function to get mining speed based on referrals
 def getMiningSpeed(referrals):
@@ -38,55 +38,57 @@ def getTotalMined():
 @bot.message_handler(commands=['start'])
 def start(message):
     userId = message.from_user.id
-    referralId = message.text.split("_start=")[1] if "_start=" in message.text else None
+    referralId = message.text.split("start=")[1] if "start=" in message.text else None
 
     # Handle referral if the user started with a referral link
     if referralId and referralLinks.get(referralId) and referralLinks[referralId] != userId:
         referrerId = referralLinks[referralId]
         userReferrals[referrerId] = userReferrals.get(referrerId, 0) + 1
         newMiningSpeed = getMiningSpeed(userReferrals[referrerId])
-        bot.reply_to(referrerId, f"0.015core/h has been added to your mining speed for the referral. Your current mining speed is {newMiningSpeed:.4f}core/h.")
+        bot.send_message(referrerId, f"0.015core/h has been added to your mining speed for the referral. Your current mining speed is {newMiningSpeed:.4f}core/h.")
+        # Add 0.1 core to referrer's balance
+        balances[referrerId] = balances.get(referrerId, 0) + 0.1
 
     # Initialize user's referral count if they don't have one
     userReferrals[userId] = userReferrals.get(userId, 0)
 
-    bot.reply_to(message.chat.id, "Welcome to Pmm core mining Telegram bot!", reply_markup={
-        "keyboard": [
-            [{"text": "web app", "web_app": {"url": "https://comforting-profiterole-cee7c2.netlify.app/"} }],
-            [{"text": "Refer a friend"}, {"text": "Claim Daily Bonus"}],
-            [{"text": "Check Balance"}, {"text": "Withdraw"}]
-        ]
-    })
+    bot.reply_to(message, "Welcome to Pmm core mining Telegram bot!", reply_markup=telebot.types.ReplyKeyboardMarkup(row_width=2).add(
+        telebot.types.KeyboardButton("Start Mining", web_app=telebot.types.WebAppInfo(url="https://comforting-profiterole-cee7c2.netlify.app/")),
+        telebot.types.KeyboardButton("Refer a friend to earn 0.1 core and +0.015core/hr mining speed"),
+        telebot.types.KeyboardButton("Claim Daily Bonus"),
+        telebot.types.KeyboardButton("Check Balance"),
+        telebot.types.KeyboardButton("Withdraw")
+    ))
 
-@bot.message_handler(func=lambda message: message.text == "Refer a friend")
+@bot.message_handler(func=lambda message: message.text == "Refer a friend to earn 0.1 core and +0.015core/hr mining speed")
 def refer_friend(message):
     userId = message.from_user.id
     userReferrals[userId] = userReferrals.get(userId, 0)
     referralLink = generateReferralLink(userId)
-    bot.reply_to(message.chat.id, f"Share this link to refer a friend: {referralLink}")
+    bot.reply_to(message, f"Share this link to refer a friend: {referralLink}")
 
 @bot.message_handler(func=lambda message: message.text == "Claim Daily Bonus")
 def claim_bonus(message):
     userId = message.from_user.id
     if claimDailyBonus(userId):
         # Add daily bonus to balance
-        # Adjust the bonus amount as needed
         # Here, we're adding 0.1 core
-        bot.reply_to(message.chat.id, "Daily bonus claimed successfully. 0.1 core added to your balance.")
+        balances[userId] = balances.get(userId, 0) + 0.1
+        bot.reply_to(message, "Daily bonus claimed successfully. 0.1 core added to your balance.")
     else:
-        bot.reply_to(message.chat.id, "You have already claimed your daily bonus today.")
+        bot.reply_to(message, "You have already claimed your daily bonus today.")
 
 @bot.message_handler(func=lambda message: message.text == "Check Balance")
 def check_balance(message):
     userId = message.from_user.id
     total_mined = getTotalMined()  # Get total mined core
-    # Placeholder for balance calculation
-    balance = 0  # Change this according to your implementation
-    bot.reply_to(message.chat.id, f"Your current balance: {balance} core\nTotal mined: {total_mined} core")
+    balance = balances.get(userId, 0)  # Get user's balance
+    bot.reply_to(message, f"Your current balance: {balance} core\nTotal mined: {total_mined} core")
 
 @bot.message_handler(func=lambda message: message.text == "Withdraw")
 def withdraw(message):
-    bot.reply_to(message.chat.id, "Minimum withdrawal is 15 core. Withdrawals will be processed at the end of every week.")
+    bot.reply_to(message, "Minimum withdrawal is 15 core. Withdrawals will be processed at the end of every week.")
 
 # Launch the bot
 bot.polling()
+
