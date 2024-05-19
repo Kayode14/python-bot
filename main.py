@@ -4,7 +4,7 @@ import random
 import time
 
 # Add your bot token here
-TOKEN = "YOUR_BOT_TOKEN_HERE"
+TOKEN = "7191033335:AAGFFNi1jEfvNQyoMR7e4Uc3Fr-VRED8ll4"
 
 bot = telebot.TeleBot(TOKEN)
 
