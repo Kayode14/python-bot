@@ -4,7 +4,7 @@ import time
 from googletrans import Translator
 
 # Add your bot token here
-TOKEN = "YOUR_BOT_TOKEN"
+TOKEN = "7191033335:AAGFFNi1jEfvNQyoMR7e4Uc3Fr-VRED8ll4"
 
 bot = telebot.TeleBot(TOKEN)
 translator = Translator()
