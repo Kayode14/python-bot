@@ -9,7 +9,7 @@ TOKEN = "7191033335:AAGFFNi1jEfvNQyoMR7e4Uc3Fr-VRED8ll4"
 bot = telebot.TeleBot(TOKEN)
 translator = Translator()
 
-user_data = {}  # In-memory storage for user data
+user_data = {}  # In-memory storage for user-specific data
 
 # Button texts in English
 buttons_en = {
@@ -31,30 +31,32 @@ buttons_cn = {
     "translate": "翻译成英文"
 }
 
+# Initialize with English buttons
+current_buttons = buttons_en
+
 # Function to generate a unique referral link
-def generate_referral_link(user_id):
-    referral_id = ''.join(random.choices('0123456789abcdef', k=8))
-    if "referral_links" not in user_data:
-        user_data["referral_links"] = {}
-    user_data["referral_links"][referral_id] = user_id
-    return f"https://t.me/PMM_MINER_BOT?start={referral_id}"
+def generateReferralLink(userId):
+    referralId = ''.join(random.choices('0123456789abcdef', k=8))
+    if "referralLinks" not in user_data:
+        user_data["referralLinks"] = {}
+    user_data["referralLinks"][referralId] = userId
+    return f"https://t.me/PMM_MINER_BOT?start={referralId}"
 
 # Function to get mining speed based on referrals
-def get_mining_speed(referrals):
+def getMiningSpeed(referrals):
     return 0.015 + (referrals * 0.0015)
 
 # Function to handle daily bonus claim
-def claim_daily_bonus(user_id):
+def claimDailyBonus(userId):
     current_time = time.time()
-    if "bonus" not in user_data[user_id]:
-        user_data[user_id]["bonus"] = 0
-    if current_time - user_data[user_id]["bonus"] >= 24 * 60 * 60:
-        user_data[user_id]["bonus"] = current_time
+    if "bonus" not in user_data[userId] or current_time - user_data[userId]["bonus"] >= 24 * 60 * 60:
+        user_data[userId]["bonus"] = current_time
         return True
     return False
 
-# Function to get total mined (Placeholder)
-def get_total_mined():
+# Function to get total mined
+def getTotalMined(userId):
+    # Placeholder for total mined calculation
     return 0  # Change this according to your implementation
 
 def create_keyboard(buttons):
@@ -71,53 +73,54 @@ def create_keyboard(buttons):
 
 @bot.message_handler(commands=['start'])
 def start(message):
-    user_id = message.from_user.id
-    username = message.from_user.username
+    userId = message.from_user.id
+    referralId = message.text.split("start=")[1] if "start=" in message.text else None
 
-    # Initialize user data if they don't exist
-    if user_id not in user_data:
-        user_data[user_id] = {
+    if userId not in user_data:
+        user_data[userId] = {
             "referrals": 0,
             "balance": 0,
-            "mining_speed": 0.015,
-            "bonus": 0,
-            "language": "en"
+            "bonus": 0
         }
 
-    referral_id = message.text.split("start=")[1] if "start=" in message.text else None
-
     # Handle referral if the user started with a referral link
-    if referral_id and "referral_links" in user_data and referral_id in user_data["referral_links"]:
-        referrer_id = user_data["referral_links"][referral_id]
-        if referrer_id != user_id:
-            user_data[referrer_id]["referrals"] += 1
-            new_mining_speed = get_mining_speed(user_data[referrer_id]["referrals"])
-            user_data[referrer_id]["mining_speed"] = new_mining_speed
-            user_data[referrer_id]["balance"] += 0.1
-            bot.send_message(referrer_id, f"0.015core/h has been added to your mining speed for the referral. Your current mining speed is {new_mining_speed:.4f}core/h.")
+    if referralId and "referralLinks" in user_data and referralId in user_data["referralLinks"] and user_data["referralLinks"][referralId] != userId:
+        referrerId = user_data["referralLinks"][referralId]
+        if referrerId not in user_data:
+            user_data[referrerId] = {
+                "referrals": 0,
+                "balance": 0,
+                "bonus": 0
+            }
+        user_data[referrerId]["referrals"] += 1
+        newMiningSpeed = getMiningSpeed(user_data[referrerId]["referrals"])
+        bot.send_message(referrerId, f"0.015core/h has been added to your mining speed for the referral. Your current mining speed is {newMiningSpeed:.4f}core/h.")
+        # Add 0.1 core to referrer's balance
+        user_data[referrerId]["balance"] += 0.1
 
-    bot.reply_to(message, "Welcome to Pmm core mining Telegram bot!", reply_markup=create_keyboard(buttons_en if user_data[user_id]["language"] == "en" else buttons_cn))
+    bot.reply_to(message, "Welcome to Pmm core mining Telegram bot!", reply_markup=create_keyboard(current_buttons))
 
 @bot.message_handler(func=lambda message: message.text in [buttons_en["refer_friend"], buttons_cn["refer_friend"]])
 def refer_friend(message):
-    user_id = message.from_user.id
-    referral_link = generate_referral_link(user_id)
-    bot.reply_to(message, f"Share this link to refer a friend: {referral_link}")
+    userId = message.from_user.id
+    referralLink = generateReferralLink(userId)
+    bot.reply_to(message, f"Share this link to refer a friend: {referralLink}")
 
 @bot.message_handler(func=lambda message: message.text in [buttons_en["claim_bonus"], buttons_cn["claim_bonus"]])
 def claim_bonus(message):
-    user_id = message.from_user.id
-    if claim_daily_bonus(user_id):
-        user_data[user_id]["balance"] += 0.1
+    userId = message.from_user.id
+    if claimDailyBonus(userId):
+        # Add daily bonus to balance
+        user_data[userId]["balance"] += 0.1
         bot.reply_to(message, "Daily bonus claimed successfully. 0.1 core added to your balance.")
     else:
         bot.reply_to(message, "You have already claimed your daily bonus today.")
 
 @bot.message_handler(func=lambda message: message.text in [buttons_en["check_balance"], buttons_cn["check_balance"]])
 def check_balance(message):
-    user_id = message.from_user.id
-    total_mined = get_total_mined()  # Placeholder for total mined core
-    balance = user_data[user_id]["balance"]  # Get user's balance
+    userId = message.from_user.id
+    total_mined = getTotalMined(userId)  # Get total mined core
+    balance = user_data[userId]["balance"]  # Get user's balance
     bot.reply_to(message, f"Your current balance: {balance} core\nTotal mined: {total_mined} core")
 
 @bot.message_handler(func=lambda message: message.text in [buttons_en["withdraw"], buttons_cn["withdraw"]])
@@ -126,12 +129,13 @@ def withdraw(message):
 
 @bot.message_handler(func=lambda message: message.text in [buttons_en["translate"], buttons_cn["translate"]])
 def translate_buttons(message):
-    user_id = message.from_user.id
-    user_data[user_id]["language"] = "cn" if user_data[user_id]["language"] == "en" else "en"
-    if user_data[user_id]["language"] == "cn":
-        bot.reply_to(message, "所有按钮已翻译成中文", reply_markup=create_keyboard(buttons_cn))
+    global current_buttons
+    if current_buttons == buttons_en:
+        current_buttons = buttons_cn
+        bot.reply_to(message, "所有按钮已翻译成中文", reply_markup=create_keyboard(current_buttons))
     else:
-        bot.reply_to(message, "All buttons have been translated to English", reply_markup=create_keyboard(buttons_en))
+        current_buttons = buttons_en
+        bot.reply_to(message, "All buttons have been translated to English", reply_markup=create_keyboard(current_buttons))
 
 # Launch the bot
 bot.polling()
